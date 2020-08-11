@@ -15,8 +15,9 @@
           <q-btn
             v-for="(c, index) in categories" :key="c.id"
             rounded
-            color="white"
-            class="text-black text-no-wrap text-capitalize"
+            :color="category && category.id == c.id ? 'primary' : 'white'"
+            :text-color="category && category.id == c.id ? 'white' : 'black'"
+            class="text-no-wrap text-capitalize"
             :class="index == 0 ? 'q-ml-md' : index == categories.length-1 ? 'q-ml-xs q-mr-md' : 'q-ml-xs'"
             size="md"
             :label="c.name"
