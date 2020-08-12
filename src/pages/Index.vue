@@ -38,7 +38,10 @@
           />
         </q-card-section>
         <q-card-section class="q-pt-none">
-          <div class="text-subtitle1">
+          <div class="text-subtitle1" v-if="openPoi.poi.name">
+            {{openPoi.poi.name}}
+          </div>
+          <div class="text-subtitle1" v-else-if="openPoi.poi.brands">
             {{openPoi.poi.brands[0].name}}
           </div>
           <div class="text-caption text-grey">
@@ -66,6 +69,8 @@ import ttServices from '@tomtom-international/web-sdk-services'
 const SearchIconCreator = require('src/components/SearchIconCreator')
 const mKey = 'ApQAkJWjATsrDgCAip5JqwHsHKLfbl0D'
 import { mapMutations, mapState } from 'vuex'
+var _ = require('lodash')
+
 export default {
   name: 'PageIndex',
   components: {
@@ -160,7 +165,7 @@ export default {
       ])
     }, (e) => {
       console.log('error', e)
-    }, { timeout: 30000 })
+    }, { maximumAge: 3000, timeout: 5000, enableHighAccuracy: true })
   },
   methods: {
     ...mapMutations('map', ['setLngLat']),
@@ -177,6 +182,7 @@ export default {
     },
     setCategory (c) {
       this.category = c
+      this.clearMarkers()
       this.loadPOICat()
     },
     mulaiSearch () {
@@ -190,7 +196,7 @@ export default {
         marker.remove()
       }
     },
-    direction () {
+    async direction () {
       const startPos = this.lngLat
 
       var lon = this.openPoi.position.lng || this.openPoi.position.lon
@@ -198,39 +204,36 @@ export default {
         lon,
         this.openPoi.position.lat
       ]
-      ttServices.services.calculateRoute({
+      const routeResponse = await ttServices.services.calculateRoute({
         key: mKey,
         traffic: false,
         locations: startPos + ':' + finalPos
+      }).go()
+      if (this.map.getLayer('route')) {
+        this.map.removeLayer('route')
+        this.map.removeSource('route')
+      }
+      var geojson = routeResponse.toGeoJson()
+      console.log(geojson)
+      this.map.addLayer({
+        id: 'route',
+        type: 'line',
+        source: {
+          type: 'geojson',
+          data: geojson
+        },
+        paint: {
+          'line-color': '#2faaff',
+          'line-width': 8
+        }
       })
-        .go()
-        .then((response) => {
-          var geojson = response.toGeoJson()
-          this.map.addLayer({
-            id: 'route',
-            type: 'line',
-            source: {
-              type: 'geojson',
-              data: geojson
-            },
-            paint: {
-              'line-color': '#2faaff',
-              'line-width': 8
-            }
-          })
-          // var coordinates = geojson.features[0].geometry.coordinates;
-          // this.updateRoutesBounds(coordinates);
-        })
-        .catch(() => {
-          console.log('error cuk')
-        })
     },
     setMarkers (data, result) {
       console.log('set markers', data)
       // var bounds = new tt.LngLatBounds()
-      this.clearMarkers()
-      for (let i = 0; i < data.length; i++) {
-        const poi = data[i]
+      // for (let i = 0; i < data.length; i++) {
+      _.each(data, (poi) => {
+        // const poi = data[i]
         var markerId = poi.id
         var countryCodeISO3 = poi.address.countryCodeISO3 ? ', ' + poi.address.countryCodeISO3 : ''
         var poiOpts = {
@@ -272,7 +275,7 @@ export default {
           this.map.jumpTo({ center: marker.getLngLat(), zoom: 14 })
           this.openPoi = poi
         }
-      }
+      })
       // this.map.fitBounds(bounds, { padding: 50 })
     }
   }
